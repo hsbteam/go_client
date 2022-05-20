@@ -56,7 +56,6 @@ type RestClient struct {
 	Api       RestApi
 	config    map[string]RestConfig
 	transport *http.Transport
-	tokens    map[string][]string
 }
 
 func (client *RestClient) GetTransport() *http.Transport {
@@ -233,7 +232,6 @@ func NewJsonResultFromError(err error) *JsonResult {
 type HsbRestClient struct {
 	restConfig map[string]RestConfig
 	transport  *http.Transport
-	tokens     map[string][]string
 }
 
 func (c *HsbRestClient) NewApi(api RestApi) *RestClient {
@@ -241,7 +239,6 @@ func (c *HsbRestClient) NewApi(api RestApi) *RestClient {
 		Api:       api,
 		config:    c.restConfig,
 		transport: c.transport,
-		tokens:    c.tokens,
 	}
 	return rest
 }
