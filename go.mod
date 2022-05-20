@@ -1,4 +1,4 @@
-module rest_client
+module github.com/hsbteam/rest_client
 
 go 1.17
 

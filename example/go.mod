@@ -2,9 +2,9 @@ module rest_example
 
 go 1.18
 
-replace rest_client => ../
+replace github.com/hsbteam/rest_client => ../
 
-require rest_client v0.0.0-00010101000000-000000000000
+require github.com/hsbteam/rest_client v0.0.0-00010101000000-000000000000
 
 require (
 	github.com/go-playground/locales v0.14.0 // indirect
