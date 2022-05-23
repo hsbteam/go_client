@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -17,14 +16,15 @@ import (
 
 //AppRestConfig 回收宝内部服务配置
 type AppRestConfig struct {
-	AppKey    string
-	AppSecret string
-	AppUrl    string
+	Name        string
+	AppKey      string
+	AppSecret   string
+	AppUrl      string
+	EventCreate func(ctx context.Context) RestEvent
 }
 
-func (clf *AppRestConfig) GetConfig(key string) string {
-	v := reflect.ValueOf(clf).Elem()
-	return v.FieldByName(key).String()
+func (clf *AppRestConfig) GetName() string {
+	return clf.Name
 }
 
 //AppRestBuild 内部接口配置
@@ -36,23 +36,77 @@ type AppRestBuild struct {
 	Method      string
 }
 
-//BuildRequest 执行请求
-func (clt *AppRestBuild) BuildRequest(_ context.Context, client *RestClient, param interface{}, _ *RestCallerInfo) *RestResult {
-	config, err := client.GetConfig()
-	if err != nil {
-		return NewRestResultFromError(err, clt)
+func NewAppRestEvent(logger func(method string, url string, httpCode int, httpHeader map[string][]string, request []byte, response []byte, err error)) *AppRestEvent {
+	return &AppRestEvent{
+		logger: logger,
 	}
+}
+
+//AppRestEvent 接口事件实现
+type AppRestEvent struct {
+	method     string
+	url        string
+	httpCode   int
+	httpHeader map[string][]string
+	request    []byte
+	response   []byte
+	logger     func(method string, url string, httpCode int, httpHeader map[string][]string, request []byte, response []byte, err error)
+}
+
+func (event *AppRestEvent) RequestStart(method, url string) {
+	event.method = method
+	event.url = url
+}
+func (event *AppRestEvent) RequestRead(data []byte) {
+	event.request = append(event.request, data...)
+}
+func (event *AppRestEvent) ResponseHeader(httpCode int, httpHeader map[string][]string) {
+	event.httpCode = httpCode
+	event.httpHeader = httpHeader
+}
+func (event *AppRestEvent) ResponseRead(data []byte) {
+	event.request = append(event.request, data...)
+}
+func (event *AppRestEvent) FinishError(err error) {
+	if event.logger != nil {
+		event.logger(event.method, event.url, event.httpCode, event.httpHeader, event.request, event.response, err)
+	}
+}
+func (event *AppRestEvent) FinishSuccess() {
+	if event.logger != nil {
+		event.logger(event.method, event.url, event.httpCode, event.httpHeader, event.request, event.response, nil)
+	}
+}
+
+//BuildRequest 执行请求
+func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, param interface{}, _ *RestCallerInfo) *RestResult {
+	tConfig, err := client.GetConfig(ctx)
+	if err != nil {
+		return NewRestResultFromError(err, &AppRestEvent{})
+	}
+	config, ok := tConfig.(*AppRestConfig)
+	if !ok {
+		return NewRestResultFromError(NewRestClientError("11", "build config is wrong"), &AppRestEvent{})
+	}
+
+	var event RestEvent
+	if config.EventCreate != nil {
+		event = config.EventCreate(ctx)
+	} else {
+		event = &AppRestEvent{}
+	}
+
 	transport := client.GetTransport()
 	headerTime := transport.ResponseHeaderTimeout
 
 	jsonParam, err := json.Marshal(param)
 	if err != nil {
-		return NewRestResultFromError(err, clt)
+		return NewRestResultFromError(err, event)
 	}
 
-	apiUrl := config.GetConfig("AppUrl")
-	appid := config.GetConfig("AppKey")
-	keyConfig := config.GetConfig("AppSecret")
+	apiUrl := config.AppUrl
+	appid := config.AppKey
+	keyConfig := config.AppSecret
 
 	reqParam := map[string]string{
 		"app_key":   appid,
@@ -63,7 +117,7 @@ func (clt *AppRestBuild) BuildRequest(_ context.Context, client *RestClient, par
 	}
 
 	if token, find := client.Api.(RestTokenApi); find {
-		reqParam["token"] = token.Token()
+		reqParam["token"] = token.Token(ctx)
 	}
 
 	var keys []string
@@ -100,12 +154,13 @@ func (clt *AppRestBuild) BuildRequest(_ context.Context, client *RestClient, par
 	} else {
 		ioRead = strings.NewReader(paramStr)
 	}
-	req, err := http.NewRequest(clt.HttpMethod, apiUrl, ioRead)
+	event.RequestStart(clt.HttpMethod, apiUrl)
+	req, err := http.NewRequest(clt.HttpMethod, apiUrl, NewRestRequestReader(ioRead, event))
 	if clt.HttpMethod == http.MethodPost {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
 	if err != nil {
-		return NewRestResultFromError(err, clt)
+		return NewRestResultFromError(err, event)
 	}
 	if clt.Timeout > 0 {
 		transport.ResponseHeaderTimeout = clt.Timeout
@@ -118,13 +173,17 @@ func (clt *AppRestBuild) BuildRequest(_ context.Context, client *RestClient, par
 		transport.ResponseHeaderTimeout = headerTime
 	}
 	if err != nil {
-		return NewRestResultFromError(err, clt)
+		return NewRestResultFromError(err, event)
 	} else {
-		return NewRestResult(clt, "response", res)
+		return NewRestResult(clt, "response", res, event)
 	}
 }
 
-func (clt *AppRestBuild) ParseResult(body string) error {
+func (clt *AppRestBuild) CheckResult(res *RestResult) error {
+	body, err := res.ReadAll()
+	if err != nil {
+		return err
+	}
 	code := gjson.Get(body, "result_response.code").String()
 	if code != "200" {
 		msg := gjson.Get(body, "result_response.msg").String()

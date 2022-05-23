@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/hsbteam/rest_client"
 	"net/http"
-	"rest_client"
 )
 
 type RestDome1 struct {
@@ -17,7 +17,7 @@ const (
 )
 
 //Config 接口列表配置
-func (res *RestDome1) Config() (string, map[int]rest_client.RestBuild) {
+func (res *RestDome1) Config(_ context.Context) (string, map[int]rest_client.RestBuild) {
 	return "product", map[int]rest_client.RestBuild{
 		ProductDetail: &rest_client.AppRestBuild{
 			HttpMethod: http.MethodGet,
@@ -33,21 +33,32 @@ func (res *RestDome1) Config() (string, map[int]rest_client.RestBuild) {
 		},
 	}
 }
-func (res *RestDome1) Token() string {
+func (res *RestDome1) Token(_ context.Context) string {
 	return res.token
 }
 
 func main() {
 	client := rest_client.NewHsbRestClient()
 	//配置
-	client.SetRestConfig("product", &rest_client.AppRestConfig{
+	client.SetRestConfig(&rest_client.AppRestConfig{
+		Name:      "product",
 		AppKey:    "hjx",
 		AppSecret: "f4dea3417a2f52ae29a635be00537395",
 		AppUrl:    "http://127.0.0.1:8080",
+		EventCreate: func(_ context.Context) rest_client.RestEvent {
+			return rest_client.NewAppRestEvent(
+				func(method string, url string, httpCode int, httpHeader map[string][]string, request []byte, response []byte, err error) {
+					if err != nil {
+
+					} else {
+
+					}
+				})
+		},
 	})
 	//使用
 	data := <-client.NewApi(&RestDome1{
-		token: "token_data",
+		token: "",
 	}).Do(context.Background(), ProductAdd, map[string]string{
 		"id": "111",
 	})
