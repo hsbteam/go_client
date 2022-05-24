@@ -20,7 +20,7 @@ type RestClientError struct {
 }
 
 func (err *RestClientError) Error() string {
-	return fmt.Sprintf("Code:%s Message:%s", err.Msg, err.Code)
+	return fmt.Sprintf("%s [%s]", err.Msg, err.Code)
 }
 
 // NewRestClientError  错误创建
