@@ -211,13 +211,15 @@ func (res *RestResult) Read(p []byte) (int, error) {
 			return 0, io.EOF
 		}
 		if sLen > pLen {
-			p = bDat[res.bodyReadOffset:pLen]
+			tmp := bDat[res.bodyReadOffset : res.bodyReadOffset+pLen]
+			copy(p[0:pLen], tmp)
 			res.bodyReadOffset += pLen
 			return pLen, nil
 		} else {
-			p = bDat[res.bodyReadOffset:sLen]
+			tmp := bDat[res.bodyReadOffset : res.bodyReadOffset+sLen]
+			copy(p[0:sLen], tmp)
 			res.bodyReadOffset += sLen
-			return sLen, nil
+			return sLen, io.EOF
 		}
 	} else {
 		n, err := res.response.Body.Read(p)
