@@ -82,18 +82,18 @@ func (event *AppRestEvent) FinishSuccess() {
 func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, param interface{}, _ *RestCallerInfo) *RestResult {
 	tConfig, err := client.GetConfig(ctx)
 	if err != nil {
-		return NewRestResultFromError(err, &AppRestEvent{})
+		return NewRestResultFromError(err, &RestEventNoop{})
 	}
 	config, ok := tConfig.(*AppRestConfig)
 	if !ok {
-		return NewRestResultFromError(NewRestClientError("11", "build config is wrong"), &AppRestEvent{})
+		return NewRestResultFromError(NewRestClientError("11", "build config is wrong"), &RestEventNoop{})
 	}
 
 	var event RestEvent
 	if config.EventCreate != nil {
 		event = config.EventCreate(ctx)
 	} else {
-		event = &AppRestEvent{}
+		event = &RestEventNoop{}
 	}
 
 	transport := client.GetTransport()

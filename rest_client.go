@@ -32,6 +32,7 @@ func NewRestClientError(code string, msg string) *RestClientError {
 	}
 }
 
+// RestEvent  事件接口,用于暴露对外请求的时的信息
 type RestEvent interface {
 	RequestStart(method, url string)                         //开始请求时回调
 	RequestRead(p []byte)                                    //成功时读取请求数据回调
@@ -41,6 +42,17 @@ type RestEvent interface {
 	FinishSuccess()                                          //结果正常时回调
 }
 
+// RestEventNoop  默认事件处理
+type RestEventNoop struct{}
+
+func (event *RestEventNoop) RequestStart(_, _ string)                    {}
+func (event *RestEventNoop) RequestRead(_ []byte)                        {}
+func (event *RestEventNoop) ResponseHeader(_ int, _ map[string][]string) {}
+func (event *RestEventNoop) ResponseRead(_ []byte)                       {}
+func (event *RestEventNoop) FinishError(_ error)                         {}
+func (event *RestEventNoop) FinishSuccess()                              {}
+
+//RestRequestReader 对请求io.Reader封装,用于读取内容时事件回调
 type RestRequestReader struct {
 	reader io.Reader
 	event  RestEvent
@@ -95,14 +107,10 @@ type RestClient struct {
 	Api       RestApi
 	config    map[string]RestConfig
 	transport *http.Transport
-	event     RestEvent
 }
 
 func (client *RestClient) GetTransport() *http.Transport {
 	return client.transport
-}
-func (client *RestClient) GetEvent() RestEvent {
-	return client.event
 }
 
 //GetConfig 获取当前使用配置
@@ -135,26 +143,28 @@ func (client *RestClient) Do(ctx context.Context, key int, param interface{}) ch
 
 //RestResult 请求接口后返回数据结构
 type RestResult struct {
-	event    RestEvent
-	valid    *validator.Validate
-	build    RestBuild
-	basePath string
-	isRead   bool
-	body     string
-	err      error
-	response *http.Response
+	event            RestEvent
+	valid            *validator.Validate
+	build            RestBuild
+	basePath         string
+	isRead           bool
+	isBodyReadOffset int
+	body             string
+	err              error
+	response         *http.Response
 }
 
 //NewRestResultFromError 创建一个错误的请求结果
 func NewRestResultFromError(err error, event RestEvent) *RestResult {
 	result := &RestResult{
-		event:    event,
-		build:    nil,
-		basePath: "",
-		isRead:   true,
-		body:     "",
-		err:      err,
-		response: nil,
+		event:            event,
+		build:            nil,
+		basePath:         "",
+		isRead:           true,
+		isBodyReadOffset: -1,
+		body:             "",
+		err:              err,
+		response:         nil,
 	}
 	if event != nil {
 		event.FinishError(err)
@@ -165,13 +175,14 @@ func NewRestResultFromError(err error, event RestEvent) *RestResult {
 //NewRestResult 创建一个正常请求结果
 func NewRestResult(build RestBuild, basePath string, response *http.Response, event RestEvent) *RestResult {
 	result := &RestResult{
-		event:    event,
-		build:    build,
-		basePath: basePath,
-		isRead:   false,
-		body:     "",
-		err:      nil,
-		response: response,
+		event:            event,
+		build:            build,
+		basePath:         basePath,
+		isRead:           false,
+		isBodyReadOffset: -1,
+		body:             "",
+		err:              nil,
+		response:         response,
 	}
 	if event != nil {
 		event.ResponseHeader(response.StatusCode, response.Header)
@@ -190,21 +201,67 @@ func NewRestResult(build RestBuild, basePath string, response *http.Response, ev
 	return result
 }
 
+//NewRestBodyResult 创建外部已经读取Response BODY的请求结果
+func NewRestBodyResult(build RestBuild, body string, basePath string, response *http.Response, event RestEvent) *RestResult {
+	result := &RestResult{
+		event:            event,
+		build:            build,
+		basePath:         basePath,
+		isRead:           true,
+		isBodyReadOffset: 0,
+		body:             body,
+		err:              nil,
+		response:         response,
+	}
+	if event != nil {
+		event.ResponseHeader(response.StatusCode, response.Header)
+	}
+	runtime.SetFinalizer(result, func(obj *RestResult) {
+		if obj.event == nil {
+			return
+		}
+		if obj.err != nil {
+			obj.event.FinishSuccess()
+		} else {
+			obj.event.FinishError(obj.err)
+		}
+	})
+	return result
+}
+
 //Read 读取接口
 func (res *RestResult) Read(p []byte) (int, error) {
 	if res.err != nil {
 		return 0, res.err
 	}
-	n, err := res.response.Body.Read(p)
-	//@todo 待测试...
-	if n > 0 {
-		res.event.ResponseRead(p[0:n])
-	} else {
-		if err != io.EOF {
-			res.err = err
+	if res.isBodyReadOffset >= 0 {
+		bDat := []byte(res.body)
+		pLen := len(p)
+		sLen := len(bDat[res.isBodyReadOffset:])
+		if sLen == 0 {
+			return 0, io.EOF
 		}
+		if sLen > pLen {
+			p = bDat[res.isBodyReadOffset:pLen]
+			res.isBodyReadOffset += pLen
+			return pLen, nil
+		} else {
+			p = bDat[res.isBodyReadOffset:sLen]
+			res.isBodyReadOffset += sLen
+			return sLen, nil
+		}
+	} else {
+		n, err := res.response.Body.Read(p)
+		//@todo 待测试...
+		if n > 0 {
+			res.event.ResponseRead(p[0:n])
+		} else {
+			if err != io.EOF {
+				res.err = err
+			}
+		}
+		return n, err
 	}
-	return n, err
 }
 
 //Err 返回错误,无错误返回nil
@@ -214,6 +271,9 @@ func (res *RestResult) Err() error {
 
 //ReadAll 返回整个BODY数据
 func (res *RestResult) ReadAll() (string, error) {
+	if res.err != nil {
+		return "", res.err
+	}
 	if !res.isRead {
 		res.isRead = true
 		body, err := ioutil.ReadAll(res)
@@ -247,13 +307,17 @@ func (res *RestResult) JsonStructData(path string, structPtr interface{}, validP
 	if err := res.parseJsonBody(); err != nil {
 		return err
 	}
+	body, err := res.ReadAll()
+	if err != nil {
+		return err
+	}
 	var param string
 	_path := res.basePath
 	if len(path) > 0 {
 		_path += "." + path
 	}
-	param = gjson.Get(res.body, _path).String()
-	err := json.Unmarshal([]byte(param), structPtr)
+	param = gjson.Get(body, _path).String()
+	err = json.Unmarshal([]byte(param), structPtr)
 	if err != nil {
 		return err
 	}
@@ -282,11 +346,15 @@ func (res *RestResult) JsonData(path string) *JsonResult {
 	if err := res.parseJsonBody(); err != nil {
 		return NewJsonResultFromError(err)
 	}
+	body, err := res.ReadAll()
+	if err != nil {
+		return NewJsonResultFromError(err)
+	}
 	_path := res.basePath
 	if len(path) > 0 {
 		_path += "." + path
 	}
-	return NewJsonResult(gjson.Get(res.body, _path))
+	return NewJsonResult(gjson.Get(body, _path))
 }
 
 /////////////JSON结果数据//////////////////
