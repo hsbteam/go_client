@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"runtime"
 	"time"
 )
 
@@ -38,8 +37,8 @@ type RestEvent interface {
 	RequestRead(p []byte)                                    //成功时读取请求数据回调
 	ResponseHeader(HttpCode int, header map[string][]string) //成功返回HEADER时回调
 	ResponseRead(p []byte)                                   //成功时读取请求内容
-	FinishError(err error)                                   //结果为错误时回调 err
-	FinishSuccess()                                          //结果正常时回调
+	ResponseFinish(err error)                                //内容读取完时回调,不存在错误时err为nil
+	ResponseCheck(err error)                                 //检测返回内容是否正常,正常时err为nil
 }
 
 // RestEventNoop  默认事件处理
@@ -49,8 +48,8 @@ func (event *RestEventNoop) RequestStart(_, _ string)                    {}
 func (event *RestEventNoop) RequestRead(_ []byte)                        {}
 func (event *RestEventNoop) ResponseHeader(_ int, _ map[string][]string) {}
 func (event *RestEventNoop) ResponseRead(_ []byte)                       {}
-func (event *RestEventNoop) FinishError(_ error)                         {}
-func (event *RestEventNoop) FinishSuccess()                              {}
+func (event *RestEventNoop) ResponseFinish(_ error)                      {}
+func (event *RestEventNoop) ResponseCheck(_ error)                       {}
 
 //RestRequestReader 对请求io.Reader封装,用于读取内容时事件回调
 type RestRequestReader struct {
@@ -81,9 +80,8 @@ type RestBuild interface {
 	BuildRequest(ctx context.Context, config *RestClient, param interface{}, callerInfo *RestCallerInfo) *RestResult
 }
 
-// RestCheckResult 检测返回结果是否正常
-type RestCheckResult interface {
-	CheckResult(res *RestResult) error
+type RestJsonResult interface {
+	CheckJsonResult(res string) error
 }
 
 // RestConfig 执行请求
@@ -143,89 +141,60 @@ func (client *RestClient) Do(ctx context.Context, key int, param interface{}) ch
 
 //RestResult 请求接口后返回数据结构
 type RestResult struct {
-	event            RestEvent
-	valid            *validator.Validate
-	build            RestBuild
-	basePath         string
-	isRead           bool
-	isBodyReadOffset int
-	body             string
-	err              error
-	response         *http.Response
+	event          RestEvent
+	build          RestBuild
+	response       *http.Response
+	body           string
+	bodyReadOffset int
+	err            error
 }
 
 //NewRestResultFromError 创建一个错误的请求结果
 func NewRestResultFromError(err error, event RestEvent) *RestResult {
 	result := &RestResult{
-		event:            event,
-		build:            nil,
-		basePath:         "",
-		isRead:           true,
-		isBodyReadOffset: -1,
-		body:             "",
-		err:              err,
-		response:         nil,
+		event:          event,
+		build:          nil,
+		bodyReadOffset: -1,
+		body:           "",
+		err:            err,
+		response:       nil,
 	}
 	if event != nil {
-		event.FinishError(err)
+		event.ResponseFinish(err)
 	}
 	return result
 }
 
 //NewRestResult 创建一个正常请求结果
-func NewRestResult(build RestBuild, basePath string, response *http.Response, event RestEvent) *RestResult {
+func NewRestResult(build RestBuild, response *http.Response, event RestEvent) *RestResult {
 	result := &RestResult{
-		event:            event,
-		build:            build,
-		basePath:         basePath,
-		isRead:           false,
-		isBodyReadOffset: -1,
-		body:             "",
-		err:              nil,
-		response:         response,
+		event:          event,
+		build:          build,
+		bodyReadOffset: -1,
+		body:           "",
+		err:            nil,
+		response:       response,
 	}
 	if event != nil {
 		event.ResponseHeader(response.StatusCode, response.Header)
 	}
-	runtime.SetFinalizer(result, func(obj *RestResult) {
-		if obj.event == nil {
-			return
-		}
-
-		if obj.err != nil {
-			obj.event.FinishSuccess()
-		} else {
-			obj.event.FinishError(obj.err)
-		}
-	})
 	return result
 }
 
 //NewRestBodyResult 创建外部已经读取Response BODY的请求结果
-func NewRestBodyResult(build RestBuild, body string, basePath string, response *http.Response, event RestEvent) *RestResult {
+func NewRestBodyResult(build RestBuild, body string, response *http.Response, event RestEvent) *RestResult {
 	result := &RestResult{
-		event:            event,
-		build:            build,
-		basePath:         basePath,
-		isRead:           true,
-		isBodyReadOffset: 0,
-		body:             body,
-		err:              nil,
-		response:         response,
+		event:          event,
+		build:          build,
+		bodyReadOffset: 0,
+		body:           body,
+		err:            nil,
+		response:       response,
 	}
 	if event != nil {
 		event.ResponseHeader(response.StatusCode, response.Header)
+		event.ResponseFinish(nil)
 	}
-	runtime.SetFinalizer(result, func(obj *RestResult) {
-		if obj.event == nil {
-			return
-		}
-		if obj.err != nil {
-			obj.event.FinishSuccess()
-		} else {
-			obj.event.FinishError(obj.err)
-		}
-	})
 	return result
 }
 
@@ -234,30 +203,35 @@ func (res *RestResult) Read(p []byte) (int, error) {
 	if res.err != nil {
 		return 0, res.err
 	}
-	if res.isBodyReadOffset >= 0 {
+	if res.bodyReadOffset >= 0 {
 		bDat := []byte(res.body)
 		pLen := len(p)
-		sLen := len(bDat[res.isBodyReadOffset:])
+		sLen := len(bDat[res.bodyReadOffset:])
 		if sLen == 0 {
 			return 0, io.EOF
 		}
 		if sLen > pLen {
-			p = bDat[res.isBodyReadOffset:pLen]
-			res.isBodyReadOffset += pLen
+			p = bDat[res.bodyReadOffset:pLen]
+			res.bodyReadOffset += pLen
 			return pLen, nil
 		} else {
-			p = bDat[res.isBodyReadOffset:sLen]
-			res.isBodyReadOffset += sLen
+			p = bDat[res.bodyReadOffset:sLen]
+			res.bodyReadOffset += sLen
 			return sLen, nil
 		}
 	} else {
 		n, err := res.response.Body.Read(p)
-		//@todo 待测试...
 		if n > 0 {
 			res.event.ResponseRead(p[0:n])
+		}
+		if err == io.EOF {
+			if res.event != nil {
+				res.event.ResponseFinish(nil)
+			}
 		} else {
-			if err != io.EOF {
-				res.err = err
+			res.err = err
+			if res.event != nil {
+				res.event.ResponseFinish(err)
 			}
 		}
 		return n, err
@@ -269,55 +243,68 @@ func (res *RestResult) Err() error {
 	return res.err
 }
 
-//ReadAll 返回整个BODY数据
-func (res *RestResult) ReadAll() (string, error) {
-	if res.err != nil {
-		return "", res.err
-	}
-	if !res.isRead {
-		res.isRead = true
-		body, err := ioutil.ReadAll(res)
-		if err != nil {
-			res.err = err
+func (res *RestResult) JsonResult(path ...string) *JsonResult {
+	defer func() {
+		if res.event != nil {
+			res.event.ResponseCheck(res.err)
 		}
-		res.body = string(body)
-	}
-	return res.body, res.err
-}
-
-//parseJsonBody 检测返回结果是否正常
-func (res *RestResult) parseJsonBody() error {
+	}()
 	if res.err != nil {
-		return res.err
-	}
-	if check, ok := res.build.(RestCheckResult); ok {
-		res.err = check.CheckResult(res)
-		if res.err != nil {
-			return res.err
+		return &JsonResult{
+			err: res.err,
 		}
 	}
-	return nil
-}
-
-//JsonStructData 按指定路径把返回数据解析为结构
-func (res *RestResult) JsonStructData(path string, structPtr interface{}, validPtr ...*validator.Validate) error {
-	if res.err != nil {
-		return res.err
-	}
-	if err := res.parseJsonBody(); err != nil {
-		return err
-	}
-	body, err := res.ReadAll()
+	body, err := ioutil.ReadAll(res)
 	if err != nil {
-		return err
+		return &JsonResult{
+			err: res.err,
+		}
 	}
+	bodyStr := string(body)
+	if check, ok := res.build.(RestJsonResult); ok {
+		res.err = check.CheckJsonResult(bodyStr)
+		if res.err != nil {
+			return &JsonResult{
+				err: res.err,
+			}
+		}
+	}
+	basePath := ""
+	if path != nil {
+		basePath = path[0]
+	}
+	return &JsonResult{
+		err:      nil,
+		basePath: basePath,
+		body:     bodyStr,
+	}
+}
+
+type JsonResult struct {
+	valid    *validator.Validate
+	basePath string
+	body     string
+	err      error
+}
+
+// Err JsonResult是否错误
+func (res *JsonResult) Err() error {
+	return res.err
+}
+
+func (res *JsonResult) GetStruct(path string, structPtr interface{}, validPtr ...*validator.Validate) error {
+	if res.err != nil {
+		return res.err
+	}
+	body := res.body
 	var param string
-	_path := res.basePath
-	if len(path) > 0 {
-		_path += "." + path
+	path = pathCreate(res.basePath, path)
+	if len(path) == 0 {
+		param = body
+	} else {
+		param = gjson.Get(body, path).String()
 	}
-	param = gjson.Get(body, _path).String()
-	err = json.Unmarshal([]byte(param), structPtr)
+	err := json.Unmarshal([]byte(param), structPtr)
 	if err != nil {
 		return err
 	}
@@ -338,46 +325,42 @@ func (res *RestResult) JsonStructData(path string, structPtr interface{}, validP
 	return nil
 }
 
-//JsonData 返回JSON中指定路径的数据
-func (res *RestResult) JsonData(path string) *JsonResult {
+func (res *JsonResult) GetData(path string) *JsonData {
 	if res.err != nil {
-		return NewJsonResultFromError(res.err)
+		return NewJsonDataFromError(res.err)
 	}
-	if err := res.parseJsonBody(); err != nil {
-		return NewJsonResultFromError(err)
+	body := res.body
+	_path := pathCreate(res.basePath, path)
+	if len(_path) == 0 {
+		return NewJsonData(gjson.Result{
+			Type: gjson.String,
+			Str:  body,
+		})
 	}
-	body, err := res.ReadAll()
-	if err != nil {
-		return NewJsonResultFromError(err)
-	}
-	_path := res.basePath
-	if len(path) > 0 {
-		_path += "." + path
-	}
-	return NewJsonResult(gjson.Get(body, _path))
+	return NewJsonData(gjson.Get(body, _path))
 }
 
 /////////////JSON结果数据//////////////////
 
-// JsonResult JSON结果数据
-type JsonResult struct {
+// JsonData JSON结果数据
+type JsonData struct {
 	gjson.Result
 	err error
 }
 
 // Err JSON结果是否错误
-func (hand *JsonResult) Err() error {
+func (hand *JsonData) Err() error {
 	return hand.err
 }
 
-// NewJsonResult 创建一个正常JSON结果
-func NewJsonResult(result gjson.Result) *JsonResult {
-	return &JsonResult{result, nil}
+// NewJsonData 创建一个正常JSON结果
+func NewJsonData(result gjson.Result) *JsonData {
+	return &JsonData{result, nil}
 }
 
-// NewJsonResultFromError 创建一个错误JSON结果
-func NewJsonResultFromError(err error) *JsonResult {
-	return &JsonResult{err: err, Result: gjson.Result{}}
+// NewJsonDataFromError 创建一个错误JSON结果
+func NewJsonDataFromError(err error) *JsonData {
+	return &JsonData{err: err, Result: gjson.Result{}}
 }
 
 /////////////// 对外接口部分//////////////////

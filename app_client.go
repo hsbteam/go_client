@@ -65,18 +65,14 @@ func (event *AppRestEvent) ResponseHeader(httpCode int, httpHeader map[string][]
 	event.httpHeader = httpHeader
 }
 func (event *AppRestEvent) ResponseRead(data []byte) {
-	event.request = append(event.request, data...)
+	event.response = append(event.response, data...)
 }
-func (event *AppRestEvent) FinishError(err error) {
+func (event *AppRestEvent) ResponseFinish(err error) {
 	if event.logger != nil {
 		event.logger(event.method, event.url, event.httpCode, event.httpHeader, event.request, event.response, err)
 	}
 }
-func (event *AppRestEvent) FinishSuccess() {
-	if event.logger != nil {
-		event.logger(event.method, event.url, event.httpCode, event.httpHeader, event.request, event.response, nil)
-	}
-}
+func (event *AppRestEvent) ResponseCheck(_ error) {}
 
 //BuildRequest 执行请求
 func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, param interface{}, _ *RestCallerInfo) *RestResult {
@@ -175,15 +171,11 @@ func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, p
 	if err != nil {
 		return NewRestResultFromError(err, event)
 	} else {
-		return NewRestResult(clt, "response", res, event)
+		return NewRestResult(clt, res, event)
 	}
 }
 
-func (clt *AppRestBuild) CheckResult(res *RestResult) error {
-	body, err := res.ReadAll()
-	if err != nil {
-		return err
-	}
+func (clt *AppRestBuild) CheckJsonResult(body string) error {
 	code := gjson.Get(body, "result_response.code").String()
 	if code != "200" {
 		msg := gjson.Get(body, "result_response.msg").String()

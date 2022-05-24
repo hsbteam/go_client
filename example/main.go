@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/hsbteam/rest_client"
 	"net/http"
+	"runtime"
 )
 
 type RestDome1 struct {
@@ -48,23 +49,25 @@ func main() {
 		EventCreate: func(_ context.Context) rest_client.RestEvent {
 			return rest_client.NewAppRestEvent(
 				func(method string, url string, httpCode int, httpHeader map[string][]string, request []byte, response []byte, err error) {
+					fmt.Printf("%s:%s [%d] \n", method, url, httpCode)
+					fmt.Printf("request:%s \n", string(request))
+					fmt.Printf("response:%s \n", string(response))
 					if err != nil {
-
-					} else {
-
+						fmt.Printf("error:%s \n", err.Error())
 					}
 				})
 		},
 	})
 	//使用
-	data := <-client.NewApi(&RestDome1{
+	data := (<-client.NewApi(&RestDome1{
 		token: "",
 	}).Do(context.Background(), ProductAdd, map[string]string{
 		"id": "111",
-	})
+	})).JsonResult()
 	if err := data.Err(); err != nil {
 		fmt.Printf("error:%s", err)
 		return
 	}
-	fmt.Printf("data:%s", data.JsonData(""))
+	fmt.Printf("data:%s", data.GetData(""))
+	runtime.GC()
 }
