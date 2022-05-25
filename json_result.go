@@ -111,7 +111,7 @@ func (res *JsonResult) GetData(dataKey interface{}) *JsonData {
 	body := res.body
 	_path := pathCreate(res.basePath, dKey.Path)
 	if len(_path) == 0 {
-		return NewJsonData(gjson.Result{
+		return NewJsonData(&gjson.Result{
 			Type: gjson.String,
 			Str:  body,
 		})
@@ -141,14 +141,14 @@ func (res *JsonResult) GetData(dataKey interface{}) *JsonData {
 			return NewJsonDataFromError(NewRestClientError("20", fmt.Sprintf("path:%s valid:%s", _path, err.Error())))
 		}
 	}
-	return NewJsonData(data)
+	return NewJsonData(&data)
 }
 
 /////////////JSON结果数据//////////////////
 
 // JsonData JSON数据
 type JsonData struct {
-	gjson.Result
+	*gjson.Result
 	err error
 }
 
@@ -158,11 +158,11 @@ func (hand *JsonData) Err() error {
 }
 
 // NewJsonData 创建一个正常JSON数据
-func NewJsonData(result gjson.Result) *JsonData {
+func NewJsonData(result *gjson.Result) *JsonData {
 	return &JsonData{result, nil}
 }
 
 // NewJsonDataFromError 创建一个错误JSON数据
 func NewJsonDataFromError(err error) *JsonData {
-	return &JsonData{err: err, Result: gjson.Result{}}
+	return &JsonData{err: err, Result: &gjson.Result{}}
 }
