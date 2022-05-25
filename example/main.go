@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/hsbteam/rest_client"
 	"net/http"
-	"runtime"
 )
 
 type RestDome1 struct {
@@ -69,5 +68,15 @@ func main() {
 		return
 	}
 	fmt.Printf("data:%s", data.GetData(""))
-	runtime.GC()
+	//获取数据并校验
+	//data.GetData(rest_client.JsonKey{
+	//	Path: "data",
+	//	ToType: func(result gjson.Result) interface{} {
+	//		return result.String()
+	//	},
+	//	Tag: "glen:10",
+	//	JsonValid: rest_client.JsonValid{
+	//		Context: context.Background(),
+	//	},
+	//})
 }

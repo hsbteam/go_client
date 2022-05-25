@@ -2,10 +2,7 @@ package rest_client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"github.com/go-playground/validator/v10"
-	"github.com/tidwall/gjson"
 	"io"
 	"io/ioutil"
 	"net"
@@ -252,117 +249,24 @@ func (res *RestResult) JsonResult(path ...string) *JsonResult {
 		}
 	}()
 	if res.err != nil {
-		return &JsonResult{
-			err: res.err,
-		}
+		return NewJsonResultFromError(res.err)
 	}
 	body, err := ioutil.ReadAll(res)
 	if err != nil {
-		return &JsonResult{
-			err: res.err,
-		}
+		return NewJsonResultFromError(res.err)
 	}
 	bodyStr := string(body)
 	if check, ok := res.build.(RestJsonResult); ok {
 		res.err = check.CheckJsonResult(bodyStr)
 		if res.err != nil {
-			return &JsonResult{
-				err: res.err,
-			}
+			return NewJsonResultFromError(res.err)
 		}
 	}
 	basePath := ""
 	if path != nil {
 		basePath = path[0]
 	}
-	return &JsonResult{
-		err:      nil,
-		basePath: basePath,
-		body:     bodyStr,
-	}
-}
-
-type JsonResult struct {
-	valid    *validator.Validate
-	basePath string
-	body     string
-	err      error
-}
-
-// Err JsonResult是否错误
-func (res *JsonResult) Err() error {
-	return res.err
-}
-
-func (res *JsonResult) GetStruct(path string, structPtr interface{}, validPtr ...*validator.Validate) error {
-	if res.err != nil {
-		return res.err
-	}
-	body := res.body
-	var param string
-	path = pathCreate(res.basePath, path)
-	if len(path) == 0 {
-		param = body
-	} else {
-		param = gjson.Get(body, path).String()
-	}
-	err := json.Unmarshal([]byte(param), structPtr)
-	if err != nil {
-		return err
-	}
-	if len(validPtr) > 0 {
-		errs := validPtr[0].Struct(structPtr)
-		if errs != nil {
-			return errs
-		}
-	} else {
-		if res.valid == nil {
-			res.valid = validator.New()
-		}
-		errs := res.valid.Struct(structPtr)
-		if errs != nil {
-			return errs
-		}
-	}
-	return nil
-}
-
-func (res *JsonResult) GetData(path string) *JsonData {
-	if res.err != nil {
-		return NewJsonDataFromError(res.err)
-	}
-	body := res.body
-	_path := pathCreate(res.basePath, path)
-	if len(_path) == 0 {
-		return NewJsonData(gjson.Result{
-			Type: gjson.String,
-			Str:  body,
-		})
-	}
-	return NewJsonData(gjson.Get(body, _path))
-}
-
-/////////////JSON结果数据//////////////////
-
-// JsonData JSON结果数据
-type JsonData struct {
-	gjson.Result
-	err error
-}
-
-// Err JSON结果是否错误
-func (hand *JsonData) Err() error {
-	return hand.err
-}
-
-// NewJsonData 创建一个正常JSON结果
-func NewJsonData(result gjson.Result) *JsonData {
-	return &JsonData{result, nil}
-}
-
-// NewJsonDataFromError 创建一个错误JSON结果
-func NewJsonDataFromError(err error) *JsonData {
-	return &JsonData{err: err, Result: gjson.Result{}}
+	return NewJsonResult(bodyStr, basePath)
 }
 
 /////////////// 对外接口部分//////////////////
