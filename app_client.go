@@ -148,10 +148,11 @@ func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, p
 		}
 		ioRead = nil
 	} else {
-		ioRead = strings.NewReader(paramStr)
+		ioRead = NewRestRequestReader(strings.NewReader(paramStr), event)
+
 	}
 	event.RequestStart(clt.HttpMethod, apiUrl)
-	req, err := http.NewRequest(clt.HttpMethod, apiUrl, NewRestRequestReader(ioRead, event))
+	req, err := http.NewRequest(clt.HttpMethod, apiUrl, ioRead)
 	if clt.HttpMethod == http.MethodPost {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}

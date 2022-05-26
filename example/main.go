@@ -60,7 +60,7 @@ func main() {
 	//使用
 	data := (<-client.NewApi(&RestDome1{
 		token: "",
-	}).Do(context.Background(), ProductAdd, map[string]string{
+	}).Do(context.Background(), ProductDetail, map[string]string{
 		"id": "111",
 	})).JsonResult()
 	if err := data.Err(); err != nil {

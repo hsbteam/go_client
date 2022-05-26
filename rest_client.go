@@ -300,9 +300,10 @@ func NewHsbRestClient(transport ...*http.Transport) *HsbRestClient {
 				Timeout:   30 * time.Second,
 				KeepAlive: 300 * time.Second,
 			}).DialContext,
-			MaxIdleConns:        120,
-			MaxIdleConnsPerHost: 12,
-			IdleConnTimeout:     8 * time.Second,
+			MaxIdleConns:          120,
+			MaxIdleConnsPerHost:   12,
+			IdleConnTimeout:       8 * time.Second,
+			ResponseHeaderTimeout: 30 * time.Second, //默认到header的等待时间最长
 		}
 	} else {
 		setTransport = transport[0]
