@@ -73,8 +73,8 @@ func (event *AppRestEvent) ResponseFinish(err error) {
 }
 func (event *AppRestEvent) ResponseCheck(_ error) {}
 
-//ParamSign 参数签名生成
-func ParamSign(version, appKey, method, timestamp, content, appSecret string, token *string) string {
+//AppRestParamSign 参数签名生成
+func AppRestParamSign(version, appKey, method, timestamp, content, appSecret string, token *string) string {
 	reqParam := map[string]string{
 		"app_key":   appKey,
 		"method":    method,
@@ -134,7 +134,7 @@ func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, p
 		token = &tokenTmp
 	}
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	dataSign := ParamSign("1.0", appid, clt.Method, timestamp, string(jsonParam), keyConfig, token)
+	dataSign := AppRestParamSign("1.0", appid, clt.Method, timestamp, string(jsonParam), keyConfig, token)
 	reqParam := map[string]string{
 		"app_key":   appid,
 		"method":    clt.Method,
