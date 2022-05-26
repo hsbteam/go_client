@@ -126,7 +126,7 @@ func (client *RestClient) Do(ctx context.Context, key int, param interface{}) ch
 		rc <- NewRestResultFromError(NewRestClientError("2", "not find rest api"), nil)
 		close(rc)
 	} else {
-		caller := callerFileInfo("hsb_client/rest_client.go", 1, 15)
+		caller := callerFileInfo("rest_client/rest_client.go", 1, 15)
 		go func() {
 			res := build.BuildRequest(ctx, client, param, caller)
 			rc <- res
