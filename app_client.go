@@ -99,11 +99,6 @@ func ParamSign(version, appKey, method, timestamp, content, appSecret string, to
 	return fmt.Sprintf("%x", dataSign)
 }
 
-type FileParam struct {
-	FileReader io.Reader
-	Param      interface{}
-}
-
 //BuildRequest 执行请求
 func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, param interface{}, _ *RestCallerInfo) *RestResult {
 	tConfig, err := client.GetConfig(ctx)
