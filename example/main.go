@@ -40,7 +40,7 @@ func (res *RestDome1) Config(_ context.Context) (string, map[int]rest_client.Res
 //}
 
 func main() {
-	client := rest_client.NewHsbRestClient()
+	client := rest_client.NewRestClientManager()
 	//配置
 	client.SetRestConfig(&rest_client.AppRestConfig{
 		Name:      "product",

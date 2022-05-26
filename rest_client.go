@@ -271,12 +271,12 @@ func (res *RestResult) JsonResult(path ...string) *JsonResult {
 
 /////////////// 对外接口部分//////////////////
 
-type HsbRestClient struct {
+type RestClientManager struct {
 	restConfig map[string]RestConfig
 	transport  *http.Transport
 }
 
-func (c *HsbRestClient) NewApi(api RestApi) *RestClient {
+func (c *RestClientManager) NewApi(api RestApi) *RestClient {
 	rest := &RestClient{
 		Api:       api,
 		config:    c.restConfig,
@@ -286,13 +286,13 @@ func (c *HsbRestClient) NewApi(api RestApi) *RestClient {
 }
 
 //SetRestConfig 设置外部接口配置
-func (c *HsbRestClient) SetRestConfig(config RestConfig) *HsbRestClient {
+func (c *RestClientManager) SetRestConfig(config RestConfig) *RestClientManager {
 	c.restConfig[config.GetName()] = config
 	return c
 }
 
-//NewHsbRestClient 新建REST客户端
-func NewHsbRestClient(transport ...*http.Transport) *HsbRestClient {
+//NewRestClientManager 新建REST客户端
+func NewRestClientManager(transport ...*http.Transport) *RestClientManager {
 	var setTransport *http.Transport
 	if transport == nil {
 		setTransport = &http.Transport{
@@ -308,7 +308,7 @@ func NewHsbRestClient(transport ...*http.Transport) *HsbRestClient {
 	} else {
 		setTransport = transport[0]
 	}
-	return &HsbRestClient{
+	return &RestClientManager{
 		restConfig: make(map[string]RestConfig),
 		transport:  setTransport,
 	}
