@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/hsbteam/rest_client"
 	"net/http"
+	"time"
 )
 
 type RestDome1 struct {
@@ -21,21 +22,22 @@ func (res *RestDome1) Config(_ context.Context) (string, map[int]rest_client.Res
 	return "product", map[int]rest_client.RestBuild{
 		ProductDetail: &rest_client.AppRestBuild{
 			HttpMethod: http.MethodGet,
-			//ParamMethod: http.MethodPost, //参数传递,默认等于  HttpMethod
-			Path:   "/jp/product", //URL路径
-			Method: "detail",      //接口名称
+			Path:       "/jp/product", //URL路径
+			Method:     "detail",      //接口名称
+			Timeout:    100 * time.Second,
 		},
 		ProductAdd: &rest_client.AppRestBuild{
 			HttpMethod: http.MethodPost,
-			//ParamMethod: http.MethodGet, //参数传递,默认等于  HttpMethod
-			Path:   "/jp/product", //URL路径
-			Method: "add",         //接口名称
+			Path:       "/jp/product", //URL路径
+			Method:     "add",         //接口名称
+			Timeout:    100 * time.Second,
 		},
 	}
 }
-func (res *RestDome1) Token(_ context.Context) string {
-	return res.token
-}
+
+//func (res *RestDome1) Token(_ context.Context) string {
+//	return res.token
+//}
 
 func main() {
 	client := rest_client.NewHsbRestClient()
@@ -60,7 +62,7 @@ func main() {
 	//使用
 	data := (<-client.NewApi(&RestDome1{
 		token: "",
-	}).Do(context.Background(), ProductDetail, map[string]string{
+	}).Do(context.Background(), ProductAdd, map[string]string{
 		"id": "111",
 	})).JsonResult()
 	if err := data.Err(); err != nil {
