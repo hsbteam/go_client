@@ -73,7 +73,7 @@ func (read *RestRequestReader) Read(p []byte) (int, error) {
 
 // RestBuild 执行请求
 type RestBuild interface {
-	BuildRequest(ctx context.Context, config *RestClient, param interface{}, callerInfo *RestCallerInfo) *RestResult
+	BuildRequest(ctx context.Context, config *RestClient, key int, param interface{}, callerInfo *RestCallerInfo) *RestResult
 }
 
 type RestJsonResult interface {
@@ -104,6 +104,7 @@ type RestClient struct {
 	transport *http.Transport
 }
 
+//GetTransport 公共的Transport
 func (client *RestClient) GetTransport() *http.Transport {
 	return client.transport
 }
@@ -121,6 +122,7 @@ func (client *RestClient) GetConfig(ctx context.Context) (RestConfig, error) {
 	return config, nil
 }
 
+//Do 执行请求
 func (client *RestClient) Do(ctx context.Context, key int, param interface{}) chan *RestResult {
 	rc := make(chan *RestResult, 1)
 	reqs, err := client.Api.ConfigBuilds(ctx)
@@ -135,7 +137,7 @@ func (client *RestClient) Do(ctx context.Context, key int, param interface{}) ch
 	} else {
 		caller := callerFileInfo("rest_client/rest_client.go", 1, 15)
 		go func() {
-			res := build.BuildRequest(ctx, client, param, caller)
+			res := build.BuildRequest(ctx, client, key, param, caller)
 			rc <- res
 			close(rc)
 		}()
@@ -257,6 +259,7 @@ func (res *RestResult) Err() error {
 	return res.err
 }
 
+//JsonResult 将结果转为JSON字符串
 func (res *RestResult) JsonResult(path ...string) *JsonResult {
 	defer func() {
 		if res.event != nil {

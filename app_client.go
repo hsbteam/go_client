@@ -100,7 +100,7 @@ func AppRestParamSign(version, appKey, method, timestamp, content, appSecret str
 }
 
 //BuildRequest 执行请求
-func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, param interface{}, _ *RestCallerInfo) *RestResult {
+func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, _ int, param interface{}, _ *RestCallerInfo) *RestResult {
 	tConfig, err := client.GetConfig(ctx)
 	if err != nil {
 		return NewRestResultFromError(err, &RestEventNoop{})
