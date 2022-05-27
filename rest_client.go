@@ -64,7 +64,6 @@ func (read *RestRequestReader) Read(p []byte) (int, error) {
 	if read.reader == nil {
 		return 0, NewRestClientError("10", "request reader is empty")
 	}
-	//@todo 待测试...
 	n, err := read.reader.Read(p)
 	if read.event != nil && n > 0 {
 		read.event.RequestRead(p[0:n])
@@ -88,13 +87,14 @@ type RestConfig interface {
 
 // RestApi 接口定义
 type RestApi interface {
-	Config(ctx context.Context) (string, map[int]RestBuild)
+	ConfigBuilds(ctx context.Context) (map[int]RestBuild, error)
+	ConfigName(ctx context.Context) (string, error)
 }
 
 // RestTokenApi 带TOKEN的接口定义
 type RestTokenApi interface {
 	RestApi
-	Token(ctx context.Context) string
+	Token(ctx context.Context) (string, error)
 }
 
 //RestClient 请求
@@ -110,7 +110,10 @@ func (client *RestClient) GetTransport() *http.Transport {
 
 //GetConfig 获取当前使用配置
 func (client *RestClient) GetConfig(ctx context.Context) (RestConfig, error) {
-	configName, _ := client.Api.Config(ctx)
+	configName, err := client.Api.ConfigName(ctx)
+	if err != nil {
+		return nil, err
+	}
 	config, ok := client.config[configName]
 	if !ok {
 		return nil, NewRestClientError("1", "rest config is exits:"+configName)
@@ -120,7 +123,11 @@ func (client *RestClient) GetConfig(ctx context.Context) (RestConfig, error) {
 
 func (client *RestClient) Do(ctx context.Context, key int, param interface{}) chan *RestResult {
 	rc := make(chan *RestResult, 1)
-	_, reqs := client.Api.Config(ctx)
+	reqs, err := client.Api.ConfigBuilds(ctx)
+	if err != nil {
+		rc <- NewRestResultFromError(err, nil)
+		return rc
+	}
 	build, find := reqs[key]
 	if !find {
 		rc <- NewRestResultFromError(NewRestClientError("2", "not find rest api"), nil)
@@ -163,6 +170,7 @@ func NewRestResultFromError(err error, event RestEvent) *RestResult {
 }
 
 //NewRestResult 创建一个正常请求结果
+//@param event 可以为nil
 func NewRestResult(build RestBuild, response *http.Response, event RestEvent) *RestResult {
 	result := &RestResult{
 		event:          event,
@@ -172,13 +180,15 @@ func NewRestResult(build RestBuild, response *http.Response, event RestEvent) *R
 		err:            nil,
 		response:       response,
 	}
-	if event != nil {
+	if event != nil && response != nil {
 		event.ResponseHeader(response.StatusCode, response.Header)
 	}
 	return result
 }
 
 //NewRestBodyResult 创建外部已经读取Response BODY的请求结果
+//@param response 可以为nil
+//@param event 可以为nil
 func NewRestBodyResult(build RestBuild, body string, response *http.Response, event RestEvent) *RestResult {
 	result := &RestResult{
 		event:          event,
@@ -189,7 +199,9 @@ func NewRestBodyResult(build RestBuild, body string, response *http.Response, ev
 		response:       response,
 	}
 	if event != nil {
-		event.ResponseHeader(response.StatusCode, response.Header)
+		if response != nil {
+			event.ResponseHeader(response.StatusCode, response.Header)
+		}
 		event.ResponseFinish(nil)
 	}
 	return result
@@ -219,6 +231,9 @@ func (res *RestResult) Read(p []byte) (int, error) {
 			return sLen, io.EOF
 		}
 	} else {
+		if res.response == nil {
+			return 0, io.EOF
+		}
 		n, err := res.response.Body.Read(p)
 		if n > 0 {
 			res.event.ResponseRead(p[0:n])

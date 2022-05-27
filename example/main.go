@@ -17,9 +17,9 @@ const (
 	ProductAdd    = iota
 )
 
-//Config 接口列表配置
-func (res *RestDome1) Config(_ context.Context) (string, map[int]rest_client.RestBuild) {
-	return "product", map[int]rest_client.RestBuild{
+func (res *RestDome1) ConfigBuilds(_ context.Context) (map[int]rest_client.RestBuild, error) {
+	//动态构建配置发生错误时返回错误即可
+	return map[int]rest_client.RestBuild{
 		ProductDetail: &rest_client.AppRestBuild{
 			HttpMethod: http.MethodGet,
 			Path:       "/jp/product", //URL路径
@@ -32,12 +32,17 @@ func (res *RestDome1) Config(_ context.Context) (string, map[int]rest_client.Res
 			Method:     "add",         //接口名称
 			Timeout:    100 * time.Second,
 		},
-	}
+	}, nil
+}
+func (res *RestDome1) ConfigName(_ context.Context) (string, error) {
+	//动态获取配置发生错误时返回错误即可
+	return "product", nil
 }
 
-//func (res *RestDome1) Token(_ context.Context) string {
-//	return res.token
-//}
+func (res *RestDome1) Token(_ context.Context) (string, error) {
+	//动态获取TOKEN发生错误时返回错误即可
+	return res.token, nil
+}
 
 func main() {
 	client := rest_client.NewRestClientManager()

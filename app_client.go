@@ -130,7 +130,10 @@ func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, p
 
 	var token *string
 	if token_, find := client.Api.(RestTokenApi); find {
-		tokenTmp := token_.Token(ctx)
+		tokenTmp, err := token_.Token(ctx)
+		if err != nil {
+			return NewRestResultFromError(err, event)
+		}
 		token = &tokenTmp
 	}
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
