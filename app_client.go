@@ -27,19 +27,19 @@ func (clf *AppRestConfig) GetName() string {
 	return clf.Name
 }
 
-type appClientError struct {
+type AppClientError struct {
 	Msg     string
 	Code    string
 	SubCode string
 }
 
-func (err *appClientError) Error() string {
+func (err *AppClientError) Error() string {
 	return fmt.Sprintf("%s [%s]", err.Msg, err.Code)
 }
 
 // NewAppClientError  错误创建
-func NewAppClientError(code string, subCode string, msg string) *appClientError {
-	return &appClientError{
+func NewAppClientError(code string, subCode string, msg string) *AppClientError {
+	return &AppClientError{
 		Code:    code,
 		Msg:     msg,
 		SubCode: subCode,

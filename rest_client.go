@@ -2,7 +2,6 @@ package rest_client
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -11,18 +10,18 @@ import (
 )
 
 // RestClientError  错误信息
-type restClientError struct {
+type RestClientError struct {
 	Msg  string
 	Code string
 }
 
-func (err *restClientError) Error() string {
-	return fmt.Sprintf("%s [%s]", err.Msg, err.Code)
+func (err *RestClientError) Error() string {
+	return err.Msg
 }
 
 // NewRestClientError  错误创建
-func NewRestClientError(code string, msg string) *restClientError {
-	return &restClientError{
+func NewRestClientError(code string, msg string) *RestClientError {
+	return &RestClientError{
 		Code: code,
 		Msg:  msg,
 	}
