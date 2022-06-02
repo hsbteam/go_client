@@ -27,6 +27,25 @@ func (clf *AppRestConfig) GetName() string {
 	return clf.Name
 }
 
+type appClientError struct {
+	Msg     string
+	Code    string
+	SubCode string
+}
+
+func (err *appClientError) Error() string {
+	return fmt.Sprintf("%s [%s]", err.Msg, err.Code)
+}
+
+// NewAppClientError  错误创建
+func NewAppClientError(code string, subCode string, msg string) *appClientError {
+	return &appClientError{
+		Code:    code,
+		Msg:     msg,
+		SubCode: subCode,
+	}
+}
+
 //AppRestBuild 内部接口配置
 type AppRestBuild struct {
 	Timeout    time.Duration //指定接口超时时间,默认0,跟全局一致
@@ -197,7 +216,7 @@ func (clt *AppRestBuild) CheckJsonResult(body string) error {
 	code := gjson.Get(body, "result_response.code").String()
 	if code != "200" {
 		msg := gjson.Get(body, "result_response.msg").String()
-		return NewRestClientError(code, "hsb server return fail:"+msg)
+		return NewAppClientError(code, gjson.Get(body, "result_response.sub_code").String(), "hsb server return fail:"+msg)
 	}
 	return nil
 }

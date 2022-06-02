@@ -11,18 +11,18 @@ import (
 )
 
 // RestClientError  错误信息
-type RestClientError struct {
+type restClientError struct {
 	Msg  string
 	Code string
 }
 
-func (err *RestClientError) Error() string {
+func (err *restClientError) Error() string {
 	return fmt.Sprintf("%s [%s]", err.Msg, err.Code)
 }
 
 // NewRestClientError  错误创建
-func NewRestClientError(code string, msg string) *RestClientError {
-	return &RestClientError{
+func NewRestClientError(code string, msg string) *restClientError {
+	return &restClientError{
 		Code: code,
 		Msg:  msg,
 	}
