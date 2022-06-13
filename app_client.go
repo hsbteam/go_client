@@ -215,7 +215,7 @@ func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, _
 func (clt *AppRestBuild) CheckJsonResult(body string) error {
 	code := gjson.Get(body, "result_response.code").String()
 	if code != "200" {
-		msg := gjson.Get(body, "result_response.msg").String()
+		msg := gjson.Get(body, "result_response.message").String()
 		return NewAppClientError(code, gjson.Get(body, "result_response.sub_code").String(), "hsb server return fail:"+msg)
 	}
 	return nil
