@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/go-playground/validator/v10"
 	"github.com/tidwall/gjson"
+	"reflect"
 )
 
 //JsonResult JSON结果集
@@ -57,6 +58,10 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 	err := json.Unmarshal([]byte(param), structPtr)
 	if err != nil {
 		return err
+	}
+	//structPtr 非结构体不做校验
+	if reflect.ValueOf(structPtr).Kind() != reflect.Struct {
+		return nil
 	}
 	var valid *validator.Validate
 	var ctx context.Context
