@@ -93,7 +93,7 @@ func (event *AppRestEvent) ResponseFinish(err error) {
 func (event *AppRestEvent) ResponseCheck(_ error) {}
 
 //AppRestParamSign 参数签名生成
-func AppRestParamSign(version, appKey, method, timestamp, content, appSecret string, token *string) string {
+func AppRestParamSign(version, appKey, method, timestamp, content, appSecret string, token *string, requestId *string) string {
 	reqParam := map[string]string{
 		"app_key":   appKey,
 		"method":    method,
@@ -103,6 +103,9 @@ func AppRestParamSign(version, appKey, method, timestamp, content, appSecret str
 	}
 	if token != nil {
 		reqParam["token"] = *token
+	}
+	if requestId != nil {
+		reqParam["request_id"] = *requestId
 	}
 	var keys []string
 	for k := range reqParam {
@@ -155,8 +158,15 @@ func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, _
 		}
 		token = &tokenTmp
 	}
+
+	var reqId *string
+	if rid_, find := client.Api.(RestRequestIdApi); find {
+		tmp := rid_.RequestId(ctx)
+		reqId = &tmp
+	}
+
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	dataSign := AppRestParamSign("1.0", appid, clt.Method, timestamp, string(jsonParam), keyConfig, token)
+	dataSign := AppRestParamSign("1.0", appid, clt.Method, timestamp, string(jsonParam), keyConfig, token, reqId)
 	reqParam := map[string]string{
 		"app_key":   appid,
 		"method":    clt.Method,
@@ -167,6 +177,9 @@ func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, _
 	}
 	if token != nil {
 		reqParam["token"] = *token
+	}
+	if reqId != nil {
+		reqParam["request_id"] = *reqId
 	}
 	pData := url.Values{}
 	for key, val := range reqParam {

@@ -98,6 +98,12 @@ type RestTokenApi interface {
 	Token(ctx context.Context) (string, error)
 }
 
+// RestRequestIdApi 带请求Id的接口定义
+type RestRequestIdApi interface {
+	RestApi
+	RequestId(ctx context.Context) string
+}
+
 //RestClient 请求
 type RestClient struct {
 	Api       RestApi

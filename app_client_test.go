@@ -41,6 +41,10 @@ func (res *testDome1) Token(_ context.Context) (string, error) {
 	return res.token, nil
 }
 
+func (res *testDome1) RequestId(_ context.Context) string {
+	return "test_id_111"
+}
+
 func TestAppClient(t *testing.T) {
 	client := NewRestClientManager()
 	//配置
