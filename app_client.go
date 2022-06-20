@@ -92,8 +92,14 @@ func (event *AppRestEvent) ResponseFinish(err error) {
 }
 func (event *AppRestEvent) ResponseCheck(_ error) {}
 
+// AppRestRequestId 新增请求header的x-request-id
+type AppRestRequestId interface {
+	RestApi
+	RequestId(ctx context.Context) string
+}
+
 //AppRestParamSign 参数签名生成
-func AppRestParamSign(version, appKey, method, timestamp, content, appSecret string, token *string, requestId *string) string {
+func AppRestParamSign(version, appKey, method, timestamp, content, appSecret string, token *string) string {
 	reqParam := map[string]string{
 		"app_key":   appKey,
 		"method":    method,
@@ -103,9 +109,6 @@ func AppRestParamSign(version, appKey, method, timestamp, content, appSecret str
 	}
 	if token != nil {
 		reqParam["token"] = *token
-	}
-	if requestId != nil {
-		reqParam["request_id"] = *requestId
 	}
 	var keys []string
 	for k := range reqParam {
@@ -159,14 +162,8 @@ func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, _
 		token = &tokenTmp
 	}
 
-	var reqId *string
-	if rid_, find := client.Api.(RestRequestIdApi); find {
-		tmp := rid_.RequestId(ctx)
-		reqId = &tmp
-	}
-
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	dataSign := AppRestParamSign("1.0", appid, clt.Method, timestamp, string(jsonParam), keyConfig, token, reqId)
+	dataSign := AppRestParamSign("1.0", appid, clt.Method, timestamp, string(jsonParam), keyConfig, token)
 	reqParam := map[string]string{
 		"app_key":   appid,
 		"method":    clt.Method,
@@ -178,9 +175,7 @@ func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, _
 	if token != nil {
 		reqParam["token"] = *token
 	}
-	if reqId != nil {
-		reqParam["request_id"] = *reqId
-	}
+
 	pData := url.Values{}
 	for key, val := range reqParam {
 		pData.Set(key, val)
@@ -201,6 +196,12 @@ func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, _
 	event.RequestStart(clt.HttpMethod, apiUrl)
 	var req *http.Request
 	req, err = http.NewRequest(clt.HttpMethod, apiUrl, ioRead)
+
+	if rid, find := client.Api.(AppRestRequestId); find {
+		tmp := rid.RequestId(ctx)
+		req.Header["X-Request-ID"] = []string{tmp}
+	}
+
 	if clt.HttpMethod == http.MethodPost {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}

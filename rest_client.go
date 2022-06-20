@@ -98,12 +98,6 @@ type RestTokenApi interface {
 	Token(ctx context.Context) (string, error)
 }
 
-// RestRequestIdApi 带请求Id的接口定义
-type RestRequestIdApi interface {
-	RestApi
-	RequestId(ctx context.Context) string
-}
-
 //RestClient 请求
 type RestClient struct {
 	Api       RestApi
@@ -214,6 +208,17 @@ func NewRestBodyResult(build RestBuild, body string, response *http.Response, ev
 		event.ResponseFinish(nil)
 	}
 	return result
+}
+
+//Header 获取返回HEADER
+func (res *RestResult) Header() (error, *http.Header) {
+	if res.err != nil {
+		return res.err, nil
+	}
+	if res.response == nil || res.response.Header == nil {
+		return nil, &http.Header{}
+	}
+	return nil, &res.response.Header
 }
 
 //Read 读取接口
