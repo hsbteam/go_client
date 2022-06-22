@@ -1,6 +1,7 @@
 package rest_client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -55,7 +56,9 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 	} else {
 		param = gjson.Get(body, path).String()
 	}
-	err := json.Unmarshal([]byte(param), structPtr)
+	dec := json.NewDecoder(bytes.NewBuffer([]byte(param)))
+	dec.UseNumber()
+	err := dec.Decode(&structPtr)
 	if err != nil {
 		return err
 	}
