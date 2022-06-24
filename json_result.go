@@ -63,7 +63,11 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 		return err
 	}
 	//structPtr 非结构体不做校验
-	if reflect.ValueOf(structPtr).Kind() != reflect.Struct {
+	val := reflect.ValueOf(structPtr)
+	if val.Kind() == reflect.Ptr && !val.IsNil() {
+		val = val.Elem()
+	}
+	if val.Kind() != reflect.Struct {
 		return nil
 	}
 	var valid *validator.Validate
