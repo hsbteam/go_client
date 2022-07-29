@@ -101,11 +101,13 @@ type AppRestRequestId interface {
 //AppRestParamSign 参数签名生成
 func AppRestParamSign(version, appKey, method, timestamp, content, appSecret string, token *string) string {
 	reqParam := map[string]string{
-		"app_key":   appKey,
-		"method":    method,
+		"app":       appKey,
 		"version":   version,
 		"timestamp": timestamp,
 		"content":   content,
+	}
+	if len(method) > 0 {
+		reqParam["method"] = method
 	}
 	if token != nil {
 		reqParam["token"] = *token
@@ -165,12 +167,14 @@ func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, _
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	dataSign := AppRestParamSign("1.0", appid, clt.Method, timestamp, string(jsonParam), keyConfig, token)
 	reqParam := map[string]string{
-		"app_key":   appid,
-		"method":    clt.Method,
+		"app":       appid,
 		"version":   "1.0",
 		"timestamp": timestamp,
 		"content":   string(jsonParam),
 		"sign":      dataSign,
+	}
+	if len(clt.Method) > 0 {
+		reqParam["method"] = clt.Method
 	}
 	if token != nil {
 		reqParam["token"] = *token
@@ -227,10 +231,10 @@ func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, _
 }
 
 func (clt *AppRestBuild) CheckJsonResult(body string) error {
-	code := gjson.Get(body, "result_response.code").String()
+	code := gjson.Get(body, "result.code").String()
 	if code != "200" {
-		msg := gjson.Get(body, "result_response.message").String()
-		return NewAppClientError(code, gjson.Get(body, "result_response.sub_code").String(), "hsb server return fail:"+msg)
+		msg := gjson.Get(body, "result.message").String()
+		return NewAppClientError(code, gjson.Get(body, "result.state").String(), "hsb server return fail:"+msg)
 	}
 	return nil
 }
