@@ -72,6 +72,25 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 	if val.Kind() == reflect.Ptr && !val.IsNil() {
 		val = val.Elem()
 	}
+
+	for i := 0; i < val.NumField(); i++ {
+		tVal := val.Field(i)
+		if jDat, ok := tVal.Interface().(*JsonData); ok {
+			if jDat == nil {
+				tVal.Set(reflect.ValueOf(NewJsonData(&gjson.Result{
+					Type: gjson.Null,
+				})))
+			}
+		}
+		if jDat, ok := tVal.Interface().(JsonData); ok {
+			if jDat.Result == nil {
+				jDat.Result = &gjson.Result{
+					Type: gjson.Null,
+				}
+			}
+		}
+	}
+
 	if val.Kind() != reflect.Struct {
 		return nil
 	}

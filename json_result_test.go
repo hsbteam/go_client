@@ -39,6 +39,7 @@ func TestNewJsonResult(t *testing.T) {
 type tmpStr struct {
 	B  *JsonData `validate:"required,email"`
 	B1 *JsonData `validate:"gte=0,lte=130"`
+	C  *JsonData
 }
 
 func (receiver *tmpStr) JsonDataToType(field string, result *gjson.Result) interface{} {
@@ -53,7 +54,7 @@ func (receiver *tmpStr) JsonDataToType(field string, result *gjson.Result) inter
 
 func TestNewJsonResultList(t *testing.T) {
 	b := "sss@qq.com"
-	b1 := "1111"
+	b1 := "11"
 	read := NewJsonResult(fmt.Sprintf(`{"a":{"B":"%s","B1":"%s"}}`, b, b1), "a")
 	var tmp tmpStr
 	if err := read.GetStruct("", &tmp); err != nil {
