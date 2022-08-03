@@ -73,6 +73,10 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 		val = val.Elem()
 	}
 
+	if val.Kind() != reflect.Struct {
+		return nil
+	}
+
 	for i := 0; i < val.NumField(); i++ {
 		tVal := val.Field(i)
 		if jDat, ok := tVal.Interface().(*JsonData); ok {
@@ -91,9 +95,6 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 		}
 	}
 
-	if val.Kind() != reflect.Struct {
-		return nil
-	}
 	var valid *validator.Validate
 	var ctx context.Context
 	if jsonValid != nil && len(jsonValid) > 0 {
