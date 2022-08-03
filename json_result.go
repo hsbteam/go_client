@@ -8,6 +8,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/tidwall/gjson"
 	"reflect"
+	"strings"
 )
 
 //JsonResult JSON结果集
@@ -41,6 +42,10 @@ type JsonValid struct {
 	valid *validator.Validate
 	//上下文通过此结构透传,如果放到 GetStruct 跟 GetData 上参数太多,实用不方便
 	Context context.Context
+}
+
+type JsonDataToType interface {
+	JsonDataToType(field string, result *gjson.Result) interface{}
 }
 
 // GetStruct 从JSON中解析出结构并验证
@@ -82,6 +87,35 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 		}
 		valid = res.valid
 	}
+
+	if tVal, ok := structPtr.(JsonDataToType); ok {
+		retH := reflect.TypeOf(structPtr)
+		if retH.Kind() == reflect.Ptr {
+			retH = retH.Elem()
+		}
+		if val.Kind() == reflect.Struct {
+			for i := 0; i < retH.NumField(); i++ {
+				field := retH.Field(i)
+				if jDat, ok := val.Field(i).Interface().(*JsonData); ok {
+					if jDat.err != nil {
+						return jDat.err
+					}
+					vTag := field.Tag.Get("validate")
+					vVal := tVal.JsonDataToType(field.Name, jDat.Result)
+					var vErr error
+					if ctx == nil {
+						vErr = valid.Var(vVal, vTag)
+					} else {
+						vErr = valid.VarCtx(ctx, vVal, vTag)
+					}
+					if vErr != nil {
+						return NewRestClientError("20", fmt.Sprintf("path:%s field:%s tag:%s value:%v error:%s ", path, field.Name, vTag, vVal, vErr.Error()))
+					}
+				}
+			}
+		}
+	}
+
 	var vErr error
 	if ctx == nil {
 		vErr = valid.Struct(structPtr)
@@ -96,26 +130,26 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 
 //JsonKey JSON获取KEY
 type JsonKey struct {
-	Path      string                                //获取路径
-	ToType    func(result gjson.Result) interface{} //转换为指定类型
-	Tag       string                                //校验用TAG
-	JsonValid                                       //JSON校验结构
+	Path       string                                 //获取路径
+	ToType     func(result *gjson.Result) interface{} //转换为指定类型
+	Tag        string                                 //校验用TAG
+	*JsonValid                                        //JSON校验结构
 }
 
 //GetData 从JSON中获取数据
 //@param dataKey 传入string 表示不校验直接获取某节点数据,传空获取所有数据
-func (res *JsonResult) GetData(dataKey interface{}) *JsonData {
+func (res *JsonResult) GetData(key interface{}) *JsonData {
 	if res.err != nil {
 		return NewJsonDataFromError(res.err)
 	}
 	var dKey *JsonKey
-	if _dKey, ok := dataKey.(*JsonKey); ok {
+	if _dKey, ok := key.(*JsonKey); ok {
 		dKey = _dKey
-	} else if path, ok := dataKey.(string); ok {
+	} else if path, ok := key.(string); ok {
 		dKey = &JsonKey{
 			Path: path,
 		}
-	} else if dataKey == nil {
+	} else if key == nil {
 		dKey = &JsonKey{}
 	} else {
 		return NewJsonDataFromError(NewRestClientError("20", "dataKey type not support"))
@@ -130,7 +164,10 @@ func (res *JsonResult) GetData(dataKey interface{}) *JsonData {
 	}
 	data := gjson.Get(body, _path)
 	if len(dKey.Tag) > 0 {
-		valid := dKey.valid
+		var valid *validator.Validate
+		if dKey.JsonValid != nil {
+			valid = dKey.valid
+		}
 		if valid == nil {
 			if res.valid == nil {
 				res.valid = validator.New()
@@ -141,16 +178,16 @@ func (res *JsonResult) GetData(dataKey interface{}) *JsonData {
 		if dKey.ToType == nil {
 			val = data.String()
 		} else {
-			val = dKey.ToType(data)
+			val = dKey.ToType(&data)
 		}
 		var err error
-		if dKey.Context == nil {
-			err = valid.Var(val, dKey.Tag)
-		} else {
+		if dKey.JsonValid != nil && dKey.Context != nil {
 			err = valid.VarCtx(dKey.Context, val, dKey.Tag)
+		} else {
+			err = valid.Var(val, dKey.Tag)
 		}
 		if err != nil {
-			return NewJsonDataFromError(NewRestClientError("20", fmt.Sprintf("path:%s valid:%s", _path, err.Error())))
+			return NewJsonDataFromError(NewRestClientError("20", fmt.Sprintf("path:%s tag:%s value:%v error:%s ", _path, dKey.Tag, val, err.Error())))
 		}
 	}
 	return NewJsonData(&data)
@@ -167,6 +204,16 @@ type JsonData struct {
 // Err JSON数据是否错误,如校验失败时通过此函数返回错误详细
 func (hand *JsonData) Err() error {
 	return hand.err
+}
+
+func (hand *JsonData) UnmarshalJSON(data []byte) error {
+	*hand = JsonData{
+		&gjson.Result{
+			Type: gjson.String,
+			Str:  strings.Trim(string(data), "\""),
+		}, nil,
+	}
+	return nil
 }
 
 // NewJsonData 创建一个正常JSON数据

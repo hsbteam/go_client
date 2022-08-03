@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/hsbteam/rest_client"
-	"github.com/tidwall/gjson"
 	"net/http"
 	"time"
 )
@@ -85,11 +84,11 @@ func main() {
 	//调用接口
 	data.GetData(rest_client.JsonKey{
 		Path: "data",
-		ToType: func(result gjson.Result) interface{} {
-			return result.String()
-		},
+		//ToType: func(result gjson.Result) interface{} {
+		//	return result.String()
+		//},
 		Tag: "glen:10",
-		JsonValid: rest_client.JsonValid{
+		JsonValid: &rest_client.JsonValid{
 			Context: context.Background(),
 		},
 	})
