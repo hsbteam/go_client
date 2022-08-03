@@ -227,12 +227,16 @@ func (hand *JsonData) Err() error {
 }
 
 func (hand *JsonData) UnmarshalJSON(data []byte) error {
-	*hand = JsonData{
+	if hand == nil {
+		return nil
+	}
+	jDat := JsonData{
 		&gjson.Result{
 			Type: gjson.String,
 			Str:  strings.Trim(string(data), "\""),
 		}, nil,
 	}
+	*hand = jDat
 	return nil
 }
 
