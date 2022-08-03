@@ -42,12 +42,16 @@ type tmpStr struct {
 	C  *JsonData
 }
 
-func (receiver *tmpStr) JsonDataToType(field string, result *gjson.Result) interface{} {
+func (receiver *tmpStr) JsonDataToType(field string, result interface{}) interface{} {
 	switch field {
 	case "B":
-		return result.String()
+		if tmp, ok := result.(*JsonData); ok {
+			return tmp.String()
+		}
 	case "B1":
-		return result.Int()
+		if tmp, ok := result.(*JsonData); ok {
+			return tmp.Int()
+		}
 	}
 	return result
 }

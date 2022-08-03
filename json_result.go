@@ -45,7 +45,7 @@ type JsonValid struct {
 }
 
 type JsonDataToType interface {
-	JsonDataToType(field string, result *gjson.Result) interface{}
+	JsonDataToType(field string, result interface{}) interface{}
 }
 
 // GetStruct 从JSON中解析出结构并验证
@@ -116,21 +116,16 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 		if val.Kind() == reflect.Struct {
 			for i := 0; i < retH.NumField(); i++ {
 				field := retH.Field(i)
-				if jDat, ok := val.Field(i).Interface().(*JsonData); ok {
-					if jDat.err != nil {
-						return jDat.err
-					}
-					vTag := field.Tag.Get("validate")
-					vVal := tVal.JsonDataToType(field.Name, jDat.Result)
-					var vErr error
-					if ctx == nil {
-						vErr = valid.Var(vVal, vTag)
-					} else {
-						vErr = valid.VarCtx(ctx, vVal, vTag)
-					}
-					if vErr != nil {
-						return NewRestClientError("20", fmt.Sprintf("path:%s field:%s tag:%s value:%v error:%s ", path, field.Name, vTag, vVal, vErr.Error()))
-					}
+				vTag := field.Tag.Get("validate")
+				vVal := tVal.JsonDataToType(field.Name, val.Field(i).Interface())
+				var vErr error
+				if ctx == nil {
+					vErr = valid.Var(vVal, vTag)
+				} else {
+					vErr = valid.VarCtx(ctx, vVal, vTag)
+				}
+				if vErr != nil {
+					return NewRestClientError("20", fmt.Sprintf("path:%s field:%s tag:%s value:%v error:%s ", path, field.Name, vTag, vVal, vErr.Error()))
 				}
 			}
 		}
