@@ -79,19 +79,19 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 
 	for i := 0; i < val.NumField(); i++ {
 		tVal := val.Field(i)
-		if jDat, ok := tVal.Interface().(*JsonData); ok {
-			if jDat == nil {
-				tVal.Set(reflect.ValueOf(NewJsonData(&gjson.Result{
-					Type: gjson.Null,
-				})))
-			}
-		}
-		if jDat, ok := tVal.Interface().(JsonData); ok {
-			if jDat.Result == nil {
-				jDat.Result = &gjson.Result{
-					Type: gjson.Null,
+		switch tVal.Kind() {
+		case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
+			if tVal.IsNil() {
+				if jDat, ok := tVal.Interface().(JsonDataDefault); ok {
+					defVal := jDat.JsonDataDefault()
+					tVal.Set(reflect.ValueOf(defVal))
 				}
 			}
+		case reflect.Struct:
+			//结构赋值待定...
+			//if reflect.PtrTo(tVal.Type()).Implements(reflect.TypeOf((*JsonDataDefault)(nil)).Elem()) {
+			//
+			//}
 		}
 	}
 
@@ -234,6 +234,25 @@ func (hand *JsonData) UnmarshalJSON(data []byte) error {
 	*hand = jDat
 	return nil
 }
+
+type JsonDataDefault interface {
+	JsonDataDefault() interface{}
+	//	JsonDataStructDefault()
+}
+
+func (hand *JsonData) JsonDataDefault() interface{} {
+	return NewJsonData(&gjson.Result{
+		Type: gjson.Null,
+	})
+}
+
+//func (hand JsonData) JsonDataStructDefault() {
+//	if hand.Result == nil {
+//		hand.Result = &gjson.Result{
+//			Type: gjson.Null,
+//		}
+//	}
+//}
 
 // NewJsonData 创建一个正常JSON数据
 func NewJsonData(result *gjson.Result) *JsonData {
