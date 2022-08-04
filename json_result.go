@@ -137,7 +137,11 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 				}
 			}
 			if vErr != nil {
-				return NewRestClientError("20", fmt.Sprintf("path:%s field:%s tag:%s error:%s ", path, field.Name, vTag, vErr.Error()))
+				bPath := path
+				if len(bPath) > 0 {
+					bPath = "path:" + bPath + " "
+				}
+				return NewRestClientError("20", fmt.Sprintf("%sfield:%s tag:%s error:%s ", bPath, field.Name, vTag, vErr.Error()))
 			}
 		}
 	}
@@ -215,7 +219,11 @@ func (res *JsonResult) GetData(key interface{}) *JsonData {
 			err = valid.Var(val, dKey.Tag)
 		}
 		if err != nil {
-			return NewJsonDataFromError(NewRestClientError("20", fmt.Sprintf("path:%s tag:%s error:%s ", _path, dKey.Tag, err.Error())))
+			bPath := res.basePath
+			if len(bPath) > 0 {
+				bPath = "path:" + bPath + " "
+			}
+			return NewJsonDataFromError(NewRestClientError("20", fmt.Sprintf("%sfield:%s tag:%s error:%s ", bPath, dKey.Path, dKey.Tag, err.Error())))
 		}
 	}
 	return NewJsonData(&data)
