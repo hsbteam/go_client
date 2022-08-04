@@ -79,7 +79,7 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 
 	for i := 0; i < val.NumField(); i++ {
 		tVal := val.Field(i)
-		println(tVal.Kind())
+		//println(tVal.Kind())
 		switch tVal.Kind() {
 		case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
 			if tVal.IsNil() {
@@ -109,25 +109,32 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 		valid = res.valid
 	}
 
-	if tVal, ok := structPtr.(JsonDataToType); ok {
-		retH := reflect.TypeOf(structPtr)
-		if retH.Kind() == reflect.Ptr {
-			retH = retH.Elem()
-		}
-		if val.Kind() == reflect.Struct {
-			for i := 0; i < retH.NumField(); i++ {
-				field := retH.Field(i)
-				vTag := field.Tag.Get("validate")
+	retH := reflect.TypeOf(structPtr)
+	if retH.Kind() == reflect.Ptr {
+		retH = retH.Elem()
+	}
+	if val.Kind() == reflect.Struct {
+		for i := 0; i < retH.NumField(); i++ {
+			field := retH.Field(i)
+			vTag := field.Tag.Get("validate")
+			var vErr error
+			if tVal, ok := structPtr.(JsonDataToType); ok {
 				vVal := tVal.JsonDataToType(field.Name, val.Field(i).Interface())
-				var vErr error
 				if ctx == nil {
 					vErr = valid.Var(vVal, vTag)
 				} else {
 					vErr = valid.VarCtx(ctx, vVal, vTag)
 				}
-				if vErr != nil {
-					return NewRestClientError("20", fmt.Sprintf("path:%s field:%s tag:%s value:%v error:%s ", path, field.Name, vTag, vVal, vErr.Error()))
+			} else {
+				vVal := val.Field(i).Interface()
+				if ctx == nil {
+					vErr = valid.Var(vVal, vTag)
+				} else {
+					vErr = valid.VarCtx(ctx, vVal, vTag)
 				}
+			}
+			if vErr != nil {
+				return NewRestClientError("20", fmt.Sprintf("path:%s field:%s tag:%s error:%s ", path, field.Name, vTag, vErr.Error()))
 			}
 		}
 	}
@@ -203,7 +210,7 @@ func (res *JsonResult) GetData(key interface{}) *JsonData {
 			err = valid.Var(val, dKey.Tag)
 		}
 		if err != nil {
-			return NewJsonDataFromError(NewRestClientError("20", fmt.Sprintf("path:%s tag:%s value:%v error:%s ", _path, dKey.Tag, val, err.Error())))
+			return NewJsonDataFromError(NewRestClientError("20", fmt.Sprintf("path:%s tag:%s error:%s ", _path, dKey.Tag, err.Error())))
 		}
 	}
 	return NewJsonData(&data)
