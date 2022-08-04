@@ -79,8 +79,9 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 
 	for i := 0; i < val.NumField(); i++ {
 		tVal := val.Field(i)
+		println(tVal.Kind())
 		switch tVal.Kind() {
-		case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
+		case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
 			if tVal.IsNil() {
 				if jDat, ok := tVal.Interface().(JsonDataDefault); ok {
 					defVal := jDat.JsonDataDefault()
