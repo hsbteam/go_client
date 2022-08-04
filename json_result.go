@@ -48,6 +48,27 @@ type JsonDataToType interface {
 	JsonDataToType(field string, result interface{}) interface{}
 }
 
+func defaultStruct(val *reflect.Value) {
+	for i := 0; i < val.NumField(); i++ {
+		tVal := val.Field(i)
+		//println(tVal.Kind())
+		switch tVal.Kind() {
+		case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
+			if tVal.IsNil() {
+				if jDat, ok := tVal.Interface().(JsonDataDefault); ok {
+					defVal := jDat.JsonDataDefault()
+					tVal.Set(reflect.ValueOf(defVal))
+				}
+			}
+		case reflect.Struct:
+			//结构赋值待定...
+			//if reflect.PtrTo(tVal.Type()).Implements(reflect.TypeOf((*JsonDataDefault)(nil)).Elem()) {
+			//
+			//}
+		}
+	}
+}
+
 // GetStruct 从JSON中解析出结构并验证
 func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid ...*JsonValid) error {
 	if res.err != nil {
@@ -74,26 +95,8 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 	}
 
 	if val.Kind() != reflect.Struct {
+		defaultStruct(&val)
 		return nil
-	}
-
-	for i := 0; i < val.NumField(); i++ {
-		tVal := val.Field(i)
-		//println(tVal.Kind())
-		switch tVal.Kind() {
-		case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
-			if tVal.IsNil() {
-				if jDat, ok := tVal.Interface().(JsonDataDefault); ok {
-					defVal := jDat.JsonDataDefault()
-					tVal.Set(reflect.ValueOf(defVal))
-				}
-			}
-		case reflect.Struct:
-			//结构赋值待定...
-			//if reflect.PtrTo(tVal.Type()).Implements(reflect.TypeOf((*JsonDataDefault)(nil)).Elem()) {
-			//
-			//}
-		}
 	}
 
 	var valid *validator.Validate
@@ -145,6 +148,8 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 	} else {
 		vErr = valid.StructCtx(ctx, structPtr)
 	}
+
+	defaultStruct(&val)
 	if vErr != nil {
 		return vErr
 	}
