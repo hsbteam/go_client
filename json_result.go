@@ -120,10 +120,8 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 	if retH.Kind() == reflect.Ptr {
 		retH = retH.Elem()
 	}
-
+	allJsonData := true
 	for i := 0; i < retH.NumField(); i++ {
-		field := retH.Field(i)
-		vTag := field.Tag.Get("validate")
 		var vErr error
 		vTmp := val.Field(i)
 		var vVal interface{}
@@ -134,6 +132,8 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 			}
 		}
 		if jData, ok := vVal.(ToJsonData); ok {
+			field := retH.Field(i)
+			vTag := field.Tag.Get("validate")
 			if tVal, ok := structPtr.(JsonDataToType); ok {
 				vVal := tVal.JsonDataToType(field.Name, jData)
 				if ctx == nil {
@@ -151,7 +151,12 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 			if vErr != nil {
 				return NewRestClientError("20", fmt.Sprintf("path:%s field:%s tag:%s error:%s ", path, field.Name, vTag, vErr.Error()))
 			}
+		} else {
+			allJsonData = false
 		}
+	}
+	if allJsonData {
+		return nil
 	}
 
 	var vErr error
