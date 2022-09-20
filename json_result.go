@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-//JsonResult JSON结果集
+// JsonResult JSON结果集
 type JsonResult struct {
 	valid    *validator.Validate
 	basePath string
@@ -20,8 +20,8 @@ type JsonResult struct {
 }
 
 // NewJsonResult 解析一个JSON字符串为JSON结果
-//@param jsonBody JSON内容
-//@param basePath 从某个节点获取,传入空字符串表示根节点获取
+// @param jsonBody JSON内容
+// @param basePath 从某个节点获取,传入空字符串表示根节点获取
 func NewJsonResult(jsonBody string, basePath string) *JsonResult {
 	return &JsonResult{body: jsonBody, basePath: basePath}
 }
@@ -36,7 +36,7 @@ func (res *JsonResult) Err() error {
 	return res.err
 }
 
-//JsonValid JSON校验结构
+// JsonValid JSON校验结构
 type JsonValid struct {
 	//外部定义校验结构
 	valid *validator.Validate
@@ -45,7 +45,7 @@ type JsonValid struct {
 }
 
 type JsonDataToType interface {
-	JsonDataToType(field string, result interface{}) interface{}
+	JsonDataToType(field string, result ToJsonData) interface{}
 }
 
 func defaultStruct(val *reflect.Value) {
@@ -121,21 +121,21 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 		retH = retH.Elem()
 	}
 
-	if val.Kind() == reflect.Struct {
-		for i := 0; i < retH.NumField(); i++ {
-			field := retH.Field(i)
-			vTag := field.Tag.Get("validate")
-			var vErr error
-			vTmp := val.Field(i)
-			var vVal interface{}
-			switch vTmp.Kind() {
-			case reflect.Ptr, reflect.Interface, reflect.Slice:
-				if !vTmp.IsNil() {
-					vVal = vTmp.Interface()
-				}
+	for i := 0; i < retH.NumField(); i++ {
+		field := retH.Field(i)
+		vTag := field.Tag.Get("validate")
+		var vErr error
+		vTmp := val.Field(i)
+		var vVal interface{}
+		switch vTmp.Kind() {
+		case reflect.Ptr, reflect.Interface, reflect.Slice:
+			if !vTmp.IsNil() {
+				vVal = vTmp.Interface()
 			}
+		}
+		if jData, ok := vVal.(ToJsonData); ok {
 			if tVal, ok := structPtr.(JsonDataToType); ok {
-				vVal := tVal.JsonDataToType(field.Name, vVal)
+				vVal := tVal.JsonDataToType(field.Name, jData)
 				if ctx == nil {
 					vErr = valid.Var(vVal, vTag)
 				} else {
@@ -168,7 +168,7 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 	return nil
 }
 
-//JsonKey JSON获取KEY
+// JsonKey JSON获取KEY
 type JsonKey struct {
 	Path       string                                 //获取路径
 	ToType     func(result *gjson.Result) interface{} //转换为指定类型
@@ -176,8 +176,8 @@ type JsonKey struct {
 	*JsonValid                                        //JSON校验结构
 }
 
-//GetData 从JSON中获取数据
-//@param dataKey 传入string 表示不校验直接获取某节点数据,传空获取所有数据
+// GetData 从JSON中获取数据
+// @param dataKey 传入string 表示不校验直接获取某节点数据,传空获取所有数据
 func (res *JsonResult) GetData(key interface{}) *JsonData {
 	if res.err != nil {
 		return NewJsonDataFromError(res.err)
@@ -244,6 +244,14 @@ type JsonData struct {
 // Err JSON数据是否错误,如校验失败时通过此函数返回错误详细
 func (hand *JsonData) Err() error {
 	return hand.err
+}
+
+type ToJsonData interface {
+	ToJsonData() *JsonData
+}
+
+func (hand *JsonData) ToJsonData() *JsonData {
+	return hand
 }
 
 func (hand *JsonData) UnmarshalJSON(data []byte) error {
