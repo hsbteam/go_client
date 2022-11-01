@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-//AppRestConfig 回收宝内部服务配置
+// AppRestConfig 回收宝内部服务配置
 type AppRestConfig struct {
 	Name        string
 	AppKey      string
@@ -46,7 +46,7 @@ func NewAppClientError(code string, subCode string, msg string) *AppClientError 
 	}
 }
 
-//AppRestBuild 内部接口配置
+// AppRestBuild 内部接口配置
 type AppRestBuild struct {
 	Timeout    time.Duration //指定接口超时时间,默认0,跟全局一致
 	Path       string        //接口路径
@@ -60,7 +60,7 @@ func NewAppRestEvent(logger func(method string, url string, httpCode int, httpHe
 	}
 }
 
-//AppRestEvent 接口事件实现
+// AppRestEvent 接口事件实现
 type AppRestEvent struct {
 	method     string
 	url        string
@@ -98,7 +98,7 @@ type AppRestRequestId interface {
 	RequestId(ctx context.Context) string
 }
 
-//AppRestParamSign 参数签名生成
+// AppRestParamSign 参数签名生成
 func AppRestParamSign(version, appKey, method, timestamp, content, appSecret string, token *string) string {
 	reqParam := map[string]string{
 		"app":       appKey,
@@ -126,7 +126,7 @@ func AppRestParamSign(version, appKey, method, timestamp, content, appSecret str
 	return fmt.Sprintf("%x", dataSign)
 }
 
-//BuildRequest 执行请求
+// BuildRequest 执行请求
 func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, _ int, param interface{}, _ *RestCallerInfo) *RestResult {
 	tConfig, err := client.GetConfig(ctx)
 	if err != nil {
@@ -234,7 +234,7 @@ func (clt *AppRestBuild) CheckJsonResult(body string) error {
 	code := gjson.Get(body, "result.code").String()
 	if code != "200" {
 		msg := gjson.Get(body, "result.message").String()
-		return NewAppClientError(code, gjson.Get(body, "result.state").String(), "hsb server return fail:"+msg)
+		return NewAppClientError(code, gjson.Get(body, "result.state").String(), "server return fail:"+msg)
 	}
 	return nil
 }
