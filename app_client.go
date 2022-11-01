@@ -234,6 +234,9 @@ func (clt *AppRestBuild) CheckJsonResult(body string) error {
 	code := gjson.Get(body, "result.code").String()
 	if code != "200" {
 		msg := gjson.Get(body, "result.message").String()
+		if len(msg) == 0 {
+			msg = body
+		}
 		return NewAppClientError(code, gjson.Get(body, "result.state").String(), "server return fail:"+msg)
 	}
 	return nil
