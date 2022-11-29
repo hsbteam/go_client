@@ -2,6 +2,7 @@ package rest_client
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -138,6 +139,12 @@ func (client *RestClient) Do(ctx context.Context, key int, param interface{}) ch
 	} else {
 		caller := callerFileInfo("rest_client/rest_client.go", 1, 15)
 		go func() {
+			defer func() {
+				if info := recover(); info != nil {
+					rc <- NewRestResultFromError(NewRestClientError("3", fmt.Sprintf("panic %v", info)), nil)
+					close(rc)
+				}
+			}()
 			res := build.BuildRequest(ctx, client, key, param, caller)
 			rc <- res
 			close(rc)
