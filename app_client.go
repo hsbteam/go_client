@@ -232,7 +232,8 @@ func (clt *AppRestBuild) BuildRequest(ctx context.Context, client *RestClient, _
 
 func (clt *AppRestBuild) CheckJsonResult(body string) error {
 	code := gjson.Get(body, "result.code").String()
-	if code != "200" {
+	state := gjson.Get(body, "result.state").String()
+	if code != "200" || state != "ok" {
 		msg := gjson.Get(body, "result.message").String()
 		if len(msg) == 0 {
 			msg = body

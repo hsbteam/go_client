@@ -82,6 +82,9 @@ func (res *JsonResult) GetStruct(path string, structPtr interface{}, jsonValid .
 	} else {
 		param = gjson.Get(body, path).String()
 	}
+	if len(param) == 0 {
+		param = "{}"
+	}
 	dec := json.NewDecoder(bytes.NewBuffer([]byte(param)))
 	dec.UseNumber()
 	err := dec.Decode(&structPtr)
